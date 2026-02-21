@@ -3,12 +3,15 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "datakit"
-version = "0.1.0"
-description = "Tools to merge and remap YOLO-format computer vision datasets"
+name = "cv-datakit"
+version = "0.1.1"
+description = "Tools to merge and remap computer vision datasets"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
+  "matplotlib>=3.9.4",
+  "numpy>=1.24",
+  "Pillow>=10.0",
   "PyYAML>=6.0",
   "rich>=13.7",
 ]
@@ -16,15 +19,13 @@ authors = [
   { name = "Imtiaz Ahammed Anik" }
 ]
 
-[project.optional-dependencies]
-visualize = [
-  "matplotlib>=3.9.4",
-  "numpy>=1.24",
-  "Pillow>=10.0",
-]
+[project.urls]
+Homepage = "https://github.com/Ghost-141/datakit"
+
 
 [project.scripts]
 datakit = "datakit.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
+include = ["datakit*"]

@@ -1,6 +1,6 @@
 from datakit import merge_datasets, merge_classes, remap_dataset, plot_random_samples
 
-merge_datasets(["Drones/", "R2P2.v2-raw-images/"], "new_dataset")
+# merge_datasets(["Drones", "R2P2.v2-raw-images.yolov11"], "new_dataset")
 # merge_classes("/path/dataset", ["Backpack", "Backpacks"], "bag")
 # remap_dataset("/path/dataset", ["bag", "person"], {0: 0, 1: 0, 2: 1})
 # plot_random_samples(

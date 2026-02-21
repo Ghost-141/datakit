@@ -1,23 +1,19 @@
 # datakit
 
+[PyPI: cv-datakit](https://pypi.org/project/cv-datakit/)
+
 Python package for YOLO-format dataset operations:
 - merge multiple datasets into one
 - merge multiple class names into a target class
 - remap class IDs
 - visualize labeled samples
 
-
-## Install 
-
-```bash
-pip install -e .
-```
-
-For visualization support, install extras:
+## Install
 
 ```bash
-pip install -e ".[visualize]"
+pip install cv-datakit
 ```
+
 
 ## CLI Usage
 
@@ -66,19 +62,6 @@ merge_datasets(["/path/ds1", "/path/ds2"], "/path/out")
 merge_classes("/path/dataset", ["Backpack", "Backpacks"], "bag")
 remap_dataset("/path/dataset", ["bag", "person"], {0: 0, 1: 0, 2: 1})
 plot_random_samples("/path/dataset/val/images", "/path/dataset/val/labels", n=12, seed=1)
-```
-
-## Examples
-
-- `examples/merge_dataset.py`
-- `examples/remap_example.py`
-- `examples/class_merge_example.py`
-- `examples/visualize_example.py`
-
-## Tests
-
-```bash
-pytest -q
 ```
 
 ## Extend to new formats
