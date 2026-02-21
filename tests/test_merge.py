@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import yaml
 
 from datakit import merge_datasets
@@ -50,3 +51,13 @@ def test_merge_datasets_offsets_and_yaml(tmp_path: Path) -> None:
     ds2_ids = [int(line.split()[0]) for line in ds2_label.read_text().splitlines()]
     assert ds1_ids == [0, 1]
     assert ds2_ids == [2]
+
+
+def test_merge_datasets_raises_when_no_images_copied(tmp_path: Path) -> None:
+    ds1 = tmp_path / "ds1"
+    out_dir = tmp_path / "out"
+
+    write_data_yaml(ds1, ["cat"], ["train"])
+
+    with pytest.raises(RuntimeError, match="No images were copied during merge"):
+        merge_datasets([str(ds1)], str(out_dir))

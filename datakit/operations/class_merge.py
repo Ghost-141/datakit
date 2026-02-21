@@ -7,7 +7,14 @@ class YoloClassMerger:
     """Facade for merging multiple class names into a target class."""
 
     def __init__(self):
-        """Initialize the YOLO class merge handler."""
+        """Initialize a class-merge facade backed by ``YoloFormatHandler``.
+
+        Example:
+            ```python
+            from datakit.operations.class_merge import YoloClassMerger
+            merger = YoloClassMerger()
+            ```
+        """
         self._handler = YoloFormatHandler()
 
     def merge(
@@ -24,6 +31,12 @@ class YoloClassMerger:
             merge_from_names: Class names to merge into the target.
             merge_into_name: Target class name to merge into.
             update_yaml: Whether to update data.yaml names in place.
+
+        Example:
+            ```python
+            merger = YoloClassMerger()
+            merger.merge("new_dataset", ["Backpack", "Backpacks"], "bag")
+            ```
         """
         self._handler.merge_classes(
             dataset_dir=dataset_dir,
@@ -39,5 +52,18 @@ def merge_classes(
     merge_into_name: str,
     update_yaml: bool = True,
 ):
-    """Convenience function to merge multiple class names into a target class."""
+    """Merge multiple class names into a target class.
+
+    Args:
+        dataset_dir: Dataset root containing labels and data.yaml.
+        merge_from_names: Class names to merge into the target.
+        merge_into_name: Target class name to merge into.
+        update_yaml: Whether to update data.yaml names in place.
+
+    Example:
+        ```python
+        from datakit import merge_classes
+        merge_classes("new_dataset", ["Backpack", "Backpacks"], "bag")
+        ```
+    """
     YoloClassMerger().merge(dataset_dir, merge_from_names, merge_into_name, update_yaml)

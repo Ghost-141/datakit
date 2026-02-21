@@ -1,12 +1,25 @@
 """YOLO-format dataset handler implementation."""
 
-import importlib.util
 import math
 import random
 import shutil
 from pathlib import Path
 
+import matplotlib.patches as patches
+import matplotlib.pyplot as plt
+import numpy as np
 import yaml
+from PIL import Image
+from rich.align import Align
+from rich.console import Console
+from rich.progress import (
+    BarColumn,
+    Progress,
+    TaskProgressColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
+from rich.table import Table
 
 from ..core.dataset import DatasetFormatHandler
 
@@ -24,25 +37,22 @@ class YoloFormatHandler(DatasetFormatHandler):
         Args:
             datasets: List of dataset root directories containing data.yaml.
             out_dir: Output directory for the merged dataset.
+
+        Example:
+            ```python
+            handler = YoloFormatHandler()
+            handler.merge_datasets(["Drones", "R2P2.v2-raw-images.yolov11"], "new_dataset")
+            ```
         """
         out_root = Path(out_dir).resolve()
         out_root.mkdir(parents=True, exist_ok=True)
         splits = ["train", "val", "test"]
 
-        (
-            Console,
-            Progress,
-            BarColumn,
-            TaskProgressColumn,
-            TextColumn,
-            TimeElapsedColumn,
-            Table,
-        ) = self._get_rich_components()
-
         merged_names = []
         offset = 0
         splits_present = set()
         yamls = []
+        total_copied_images = 0
 
         for ds in datasets:
             ds_root = Path(ds).resolve()
@@ -89,7 +99,7 @@ class YoloFormatHandler(DatasetFormatHandler):
 
                 for split in splits:
                     if split in split_image_paths:
-                        self._copy_split(
+                        copied_images = self._copy_split(
                             ds_root,
                             y,
                             split,
@@ -100,9 +110,17 @@ class YoloFormatHandler(DatasetFormatHandler):
                             progress=progress,
                             task_id=task_id,
                         )
+                        total_copied_images += copied_images
 
                 merged_names.extend(names)
                 offset += len(names)
+
+        if total_copied_images == 0:
+            raise RuntimeError(
+                "No images were copied during merge. "
+                "Check each dataset's data.yaml split paths (train/val/test) and "
+                "make sure they point to existing image directories."
+            )
 
         merged_yaml = {
             "path": str(out_root),
@@ -117,18 +135,24 @@ class YoloFormatHandler(DatasetFormatHandler):
         with open(out_root / "data.yaml", "w", encoding="utf-8") as f:
             yaml.safe_dump(merged_yaml, f, sort_keys=False, allow_unicode=True)
 
-        print(f"Merged {len(datasets)} datasets into: {out_root}")
-        # print(f"Total classes (nc): {len(merged_names)}")
-        print(f"YAML written: {out_root / 'data.yaml'}")
+        console = Console()
 
         table = Table(title="Final Class Mapping")
-        table.add_column("ID", justify="right", style="cyan", no_wrap=True)
+        table.add_column("ID", justify="center", style="cyan", no_wrap=True)
         table.add_column("Class Name", style="green")
 
         for class_id, class_name in enumerate(merged_names):
             table.add_row(str(class_id), str(class_name))
 
-        Console().print(table)
+        console.line()
+        console.print(Align.center(table))
+
+        summary = Table(title="Summary", show_header=False)
+        summary.add_column("Field", style="cyan")
+        summary.add_column("Value", style="green")
+        summary.add_row("Number of dataset:", str(len(datasets)))
+        summary.add_row("Mergred dataset to:", str(out_root))
+        console.print(Align.center(summary))
 
     def merge_classes(
         self,
@@ -144,6 +168,16 @@ class YoloFormatHandler(DatasetFormatHandler):
             merge_from_names: Class names to merge into the target.
             merge_into_name: Target class name to merge into.
             update_yaml: Whether to update data.yaml names in place.
+
+        Example:
+            ```python
+            handler = YoloFormatHandler()
+            handler.merge_classes(
+                dataset_dir="new_dataset",
+                merge_from_names=["Backpack", "Backpacks"],
+                merge_into_name="bag",
+            )
+            ```
         """
         dataset_dir = Path(dataset_dir).resolve()
         data_yaml = dataset_dir / "data.yaml"
@@ -235,6 +269,16 @@ class YoloFormatHandler(DatasetFormatHandler):
             dataset_dir: Dataset root containing labels and data.yaml.
             new_names: New class names in final ID order.
             id_mapping: Mapping from old class IDs to new IDs.
+
+        Example:
+            ```python
+            handler = YoloFormatHandler()
+            handler.remap_dataset(
+                dataset_dir="new_dataset",
+                new_names=["bag", "person"],
+                id_mapping={0: 0, 1: 0, 2: 1},
+            )
+            ```
         """
         dataset_dir = Path(dataset_dir).resolve()
         data_yaml = dataset_dir / "data.yaml"
@@ -324,9 +368,19 @@ class YoloFormatHandler(DatasetFormatHandler):
             seed: Random seed for sampling.
             cols: Column count for the grid (auto if None).
             tile_size: Target tile size (width, height).
-        """
-        patches, plt, np, Image = self._get_visualize_components()
 
+        Example:
+            ```python
+            handler = YoloFormatHandler()
+            handler.visualize_samples(
+                images_dir="new_dataset/train/images",
+                labels_dir="new_dataset/train/labels",
+                names=["car", "person"],
+                n=12,
+                seed=2,
+            )
+            ```
+        """
         images_path = Path(images_dir)
         labels_path = Path(labels_dir)
 
@@ -376,7 +430,7 @@ class YoloFormatHandler(DatasetFormatHandler):
             img = Image.open(img_path).convert("RGB")
             img_w, img_h = img.size
             letterboxed, scale, pad_x, pad_y = self._letterbox_image(
-                img, tile_w, tile_h, Image
+                img, tile_w, tile_h
             )
 
             ax.imshow(np.asarray(letterboxed))
@@ -430,61 +484,53 @@ class YoloFormatHandler(DatasetFormatHandler):
 
         plt.show()
 
-    def _get_rich_components(self):
-        """Load rich components used by merge output."""
-        if importlib.util.find_spec("rich") is None:
-            raise ImportError(
-                "Merging with progress requires 'rich'. Install with: pip install rich"
-            )
-
-        from rich.console import Console
-        from rich.progress import (
-            BarColumn,
-            Progress,
-            TaskProgressColumn,
-            TextColumn,
-            TimeElapsedColumn,
-        )
-        from rich.table import Table
-
-        return (
-            Console,
-            Progress,
-            BarColumn,
-            TaskProgressColumn,
-            TextColumn,
-            TimeElapsedColumn,
-            Table,
-        )
-
-    def _get_visualize_components(self):
-        """Load visualization dependencies only when needed."""
-        required_modules = ("matplotlib", "numpy", "PIL")
-        if any(importlib.util.find_spec(module) is None for module in required_modules):
-            raise ImportError(
-                "Visualization requires optional dependencies. "
-                "Install with: pip install 'datakit[visualize]'"
-            )
-
-        import matplotlib.patches as patches
-        import matplotlib.pyplot as plt
-        import numpy as np
-        from PIL import Image
-
-        return patches, plt, np, Image
-
     def _load_yaml(self, yaml_path: Path):
-        """Load YAML content from disk."""
+        """Load YAML content from disk.
+
+        Args:
+            yaml_path: Path to a YAML file.
+
+        Returns:
+            Parsed YAML as a Python object.
+
+        Example:
+            ```python
+            data = handler._load_yaml(Path("Drones/data.yaml"))
+            ```
+        """
         with open(yaml_path, "r", encoding="utf-8") as f:
             return yaml.safe_load(f)
 
     def _save_yaml(self, yaml_path: Path, content: dict):
-        """Write YAML content to disk."""
+        """Write YAML content to disk.
+
+        Args:
+            yaml_path: Destination YAML file path.
+            content: Mapping to serialize.
+
+        Example:
+            ```python
+            handler._save_yaml(Path("new_dataset/data.yaml"), {"nc": 2, "names": {0: "car", 1: "person"}})
+            ```
+        """
         with open(yaml_path, "w", encoding="utf-8") as f:
             yaml.safe_dump(content, f, sort_keys=False, allow_unicode=True)
 
     def _get_names(self, y: dict):
-        """Normalize the YAML names field to a list of class names."""
+        """Normalize the YAML ``names`` field to a list of class names.
+
+        Args:
+            y: Parsed ``data.yaml`` content.
+
+        Returns:
+            A class-name list in index order.
+
+        Example:
+            ```python
+            names = handler._get_names({"names": {0: "car", 1: "person"}})
+            # names == ["car", "person"]
+            ```
+        """
         names = y.get("names")
         if isinstance(names, dict):
             return [names[i] for i in range(len(names))]
@@ -493,7 +539,21 @@ class YoloFormatHandler(DatasetFormatHandler):
         raise ValueError("Unsupported YAML 'names' format. Use list or dict.")
 
     def _split_path(self, y: dict, split_key: str, dataset_root: Path):
-        """Resolve a split path from YAML, relative to the dataset root."""
+        """Resolve a split path from YAML relative to the dataset root.
+
+        Args:
+            y: Parsed ``data.yaml`` content.
+            split_key: Split key such as ``train``, ``val``, or ``test``.
+            dataset_root: Root folder of the source dataset.
+
+        Returns:
+            Absolute split path, or ``None`` if the split key is missing.
+
+        Example:
+            ```python
+            train_dir = handler._split_path({"train": "train/images"}, "train", Path("Drones"))
+            ```
+        """
         p = y.get(split_key)
         if not p:
             return None
@@ -504,7 +564,22 @@ class YoloFormatHandler(DatasetFormatHandler):
         return p
 
     def _rewrite_label_file(self, src_label: Path, dst_label: Path, offset: int):
-        """Copy a label file while offsetting class IDs."""
+        """Copy a label file while offsetting class IDs.
+
+        Args:
+            src_label: Source YOLO label file.
+            dst_label: Destination label file path.
+            offset: Class-ID offset to add to each row.
+
+        Example:
+            ```python
+            handler._rewrite_label_file(
+                Path("Drones/train/labels/img1.txt"),
+                Path("new_dataset/train/labels/ds1__img1.txt"),
+                offset=3,
+            )
+            ```
+        """
         dst_label.parent.mkdir(parents=True, exist_ok=True)
         if not src_label.exists():
             return
@@ -535,11 +610,38 @@ class YoloFormatHandler(DatasetFormatHandler):
         image_paths: list[Path] | None = None,
         progress=None,
         task_id: int | None = None,
-    ):
-        """Copy images/labels for a split, applying class ID offsets."""
+    ) -> int:
+        """Copy images/labels for a split, applying class ID offsets.
+
+        Args:
+            dataset_root: Source dataset root.
+            y: Parsed source ``data.yaml`` content.
+            split_key: Split key such as ``train``.
+            out_root: Merged output dataset root.
+            offset: Class-ID offset for this dataset.
+            dataset_tag: Prefix used for destination file names.
+            image_paths: Optional pre-collected image paths.
+            progress: Optional rich progress object.
+            task_id: Optional task id for progress updates.
+
+        Returns:
+            Number of images copied for this split.
+
+        Example:
+            ```python
+            copied = handler._copy_split(
+                dataset_root=Path("Drones"),
+                y={"train": "train/images"},
+                split_key="train",
+                out_root=Path("new_dataset"),
+                offset=0,
+                dataset_tag="ds1",
+            )
+            ```
+        """
         img_dir = self._split_path(y, split_key, dataset_root)
         if img_dir is None:
-            return
+            return 0
 
         parts = list(img_dir.parts)
         if "images" not in parts:
@@ -556,10 +658,12 @@ class YoloFormatHandler(DatasetFormatHandler):
         if image_paths is None:
             image_paths = self._collect_split_images(img_dir)
 
+        copied_images = 0
         for img_path in image_paths:
             new_name = f"{dataset_tag}__{img_path.name}"
             dst_img = out_img_dir / new_name
             shutil.copy2(img_path, dst_img)
+            copied_images += 1
 
             src_label = lbl_dir / (img_path.stem + ".txt")
             dst_label = out_lbl_dir / (Path(new_name).stem + ".txt")
@@ -568,8 +672,22 @@ class YoloFormatHandler(DatasetFormatHandler):
             if progress is not None and task_id is not None:
                 progress.advance(task_id)
 
+        return copied_images
+
     def _collect_split_images(self, img_dir: Path):
-        """Collect image files for a split directory."""
+        """Collect image files for a split directory.
+
+        Args:
+            img_dir: Split image directory.
+
+        Returns:
+            List of image file paths with supported extensions.
+
+        Example:
+            ```python
+            images = handler._collect_split_images(Path("Drones/train/images"))
+            ```
+        """
         return [
             p
             for p in img_dir.rglob("*")
@@ -577,7 +695,19 @@ class YoloFormatHandler(DatasetFormatHandler):
         ]
 
     def _find_label_dirs(self, dataset_dir: Path):
-        """Find labels directories in common YOLO layouts."""
+        """Find labels directories in common YOLO layouts.
+
+        Args:
+            dataset_dir: Dataset root path.
+
+        Returns:
+            List of detected label directories.
+
+        Example:
+            ```python
+            label_dirs = handler._find_label_dirs(Path("new_dataset"))
+            ```
+        """
         label_dirs = []
 
         for split in self._img_splits:
@@ -593,7 +723,19 @@ class YoloFormatHandler(DatasetFormatHandler):
         return label_dirs
 
     def _find_label_files(self, dataset_dir: Path):
-        """Find label files in common YOLO layouts."""
+        """Find label files in common YOLO layouts.
+
+        Args:
+            dataset_dir: Dataset root path.
+
+        Returns:
+            List of label ``.txt`` files.
+
+        Example:
+            ```python
+            label_files = handler._find_label_files(Path("new_dataset"))
+            ```
+        """
         files = list(dataset_dir.rglob("labels/**/*.txt"))
         if files:
             return files
@@ -606,12 +748,42 @@ class YoloFormatHandler(DatasetFormatHandler):
     def _find_label_path(
         self, img_path: Path, images_dir: Path, labels_dir: Path
     ) -> Path:
-        """Compute the label path corresponding to an image path."""
+        """Compute the label path corresponding to an image path.
+
+        Args:
+            img_path: Image file path.
+            images_dir: Root image directory.
+            labels_dir: Root labels directory.
+
+        Returns:
+            The corresponding label path with ``.txt`` suffix.
+
+        Example:
+            ```python
+            label_path = handler._find_label_path(
+                Path("new_dataset/train/images/a.jpg"),
+                Path("new_dataset/train/images"),
+                Path("new_dataset/train/labels"),
+            )
+            ```
+        """
         rel = img_path.relative_to(images_dir)
         return (labels_dir / rel).with_suffix(".txt")
 
     def _read_yolo_labels(self, label_path: Path):
-        """Read YOLO label files into (class_id, xc, yc, w, h) tuples."""
+        """Read YOLO labels into ``(class_id, xc, yc, w, h)`` tuples.
+
+        Args:
+            label_path: Path to a YOLO label file.
+
+        Returns:
+            List of parsed label tuples.
+
+        Example:
+            ```python
+            boxes = handler._read_yolo_labels(Path("new_dataset/train/labels/a.txt"))
+            ```
+        """
         if not label_path.exists():
             return []
 
@@ -633,7 +805,24 @@ class YoloFormatHandler(DatasetFormatHandler):
         return boxes
 
     def _yolo_to_xyxy(self, xc, yc, w, h, img_w, img_h):
-        """Convert YOLO normalized boxes to clamped pixel xyxy."""
+        """Convert YOLO normalized box values to clamped pixel ``xyxy``.
+
+        Args:
+            xc: Normalized x-center.
+            yc: Normalized y-center.
+            w: Normalized width.
+            h: Normalized height.
+            img_w: Source image width.
+            img_h: Source image height.
+
+        Returns:
+            Tuple ``(x1, y1, x2, y2)`` in image pixel coordinates.
+
+        Example:
+            ```python
+            x1, y1, x2, y2 = handler._yolo_to_xyxy(0.5, 0.5, 0.2, 0.2, 1280, 720)
+            ```
+        """
         x_center = xc * img_w
         y_center = yc * img_h
         bw = w * img_w
@@ -650,15 +839,29 @@ class YoloFormatHandler(DatasetFormatHandler):
         y2 = max(0, min(img_h - 1, y2))
         return x1, y1, x2, y2
 
-    def _letterbox_image(self, img, target_w: int, target_h: int, image_module):
-        """Resize an image with letterboxing to the target size."""
+    def _letterbox_image(self, img, target_w: int, target_h: int):
+        """Resize an image with letterboxing to the target size.
+
+        Args:
+            img: ``PIL.Image`` instance.
+            target_w: Output canvas width.
+            target_h: Output canvas height.
+
+        Returns:
+            Tuple ``(canvas, scale, pad_x, pad_y)``.
+
+        Example:
+            ```python
+            canvas, scale, pad_x, pad_y = handler._letterbox_image(img, 640, 640)
+            ```
+        """
         img_w, img_h = img.size
         scale = min(target_w / img_w, target_h / img_h)
         new_w = max(1, int(round(img_w * scale)))
         new_h = max(1, int(round(img_h * scale)))
 
-        resized = img.resize((new_w, new_h), image_module.Resampling.BILINEAR)
-        canvas = image_module.new("RGB", (target_w, target_h), color=(20, 20, 20))
+        resized = img.resize((new_w, new_h), Image.Resampling.BILINEAR)
+        canvas = Image.new("RGB", (target_w, target_h), color=(20, 20, 20))
 
         pad_x = (target_w - new_w) // 2
         pad_y = (target_h - new_h) // 2

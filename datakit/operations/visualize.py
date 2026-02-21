@@ -7,7 +7,20 @@ from ..formats.yolo import YoloFormatHandler
 
 
 def _normalize_dir_input(path_value: str) -> str:
-    """Normalize user-provided directory paths for common Windows CLI mistakes."""
+    """Normalize user-provided directory paths for common Windows CLI mistakes.
+
+    Args:
+        path_value: Raw path value from user or CLI input.
+
+    Returns:
+        A normalized path string that resolves common leading-slash mistakes.
+
+    Example:
+        ```python
+        from datakit.operations.visualize import _normalize_dir_input
+        fixed = _normalize_dir_input("/Users/you/dataset/train/images")
+        ```
+    """
     path = Path(path_value).expanduser()
     if path.exists():
         return str(path)
@@ -27,7 +40,14 @@ class YoloVisualizer:
     """Facade for visualizing YOLO datasets with labels."""
 
     def __init__(self):
-        """Initialize the YOLO visualization handler."""
+        """Initialize a visualization facade backed by ``YoloFormatHandler``.
+
+        Example:
+            ```python
+            from datakit.operations.visualize import YoloVisualizer
+            visualizer = YoloVisualizer()
+            ```
+        """
         self._handler = YoloFormatHandler()
 
     def plot_random_samples(
@@ -50,6 +70,18 @@ class YoloVisualizer:
             seed: Random seed for sampling.
             cols: Column count for the grid (auto if None).
             tile_size: Target tile size (width, height).
+
+        Example:
+            ```python
+            visualizer = YoloVisualizer()
+            visualizer.plot_random_samples(
+                images_dir="new_dataset/train/images",
+                labels_dir="new_dataset/train/labels",
+                names=["car", "person"],
+                n=12,
+                seed=2,
+            )
+            ```
         """
         images_dir = _normalize_dir_input(images_dir)
         labels_dir = _normalize_dir_input(labels_dir)
@@ -74,7 +106,28 @@ def plot_random_samples(
     cols: int | None = None,
     tile_size: tuple[int, int] = (640, 640),
 ):
-    """Convenience function to visualize random labeled samples."""
+    """Visualize random labeled samples.
+
+    Args:
+        images_dir: Directory containing images.
+        labels_dir: Directory containing label files.
+        names: Optional list of class names.
+        n: Number of images to sample.
+        seed: Random seed for sampling.
+        cols: Column count for the grid (auto if None).
+        tile_size: Target tile size (width, height).
+
+    Example:
+        ```python
+        from datakit import plot_random_samples
+        plot_random_samples(
+            images_dir="new_dataset/train/images",
+            labels_dir="new_dataset/train/labels",
+            names=["car", "person"],
+            n=9,
+        )
+        ```
+    """
     YoloVisualizer().plot_random_samples(
         images_dir=images_dir,
         labels_dir=labels_dir,

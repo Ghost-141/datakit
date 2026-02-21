@@ -12,8 +12,17 @@ def get_format_handler(format_name: str) -> DatasetFormatHandler:
     Args:
         format_name: Human-friendly format identifier (e.g., "yolo").
 
+    Returns:
+        An initialized dataset format handler instance.
+
     Raises:
         ValueError: If the format name is not supported.
+
+    Example:
+        ```python
+        from datakit.formats import get_format_handler
+        handler = get_format_handler("yolo")
+        ```
     """
     handlers = {
         "yolo": YoloFormatHandler,

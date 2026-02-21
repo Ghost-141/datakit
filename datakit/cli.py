@@ -6,7 +6,20 @@ from .formats import get_format_handler
 
 
 def _parse_mapping(mapping_values: list[str]):
-    """Parse OLD:NEW mappings from CLI into an integer dict."""
+    """Parse ``OLD:NEW`` mapping tokens from CLI input.
+
+    Args:
+        mapping_values: Sequence like ``["0:0", "1:0", "2:1"]``.
+
+    Returns:
+        Dictionary mapping old class IDs to new class IDs.
+
+    Example:
+        ```python
+        mapping = _parse_mapping(["0:0", "1:0", "2:1"])
+        # mapping == {0: 0, 1: 0, 2: 1}
+        ```
+    """
     mapping = {}
     for item in mapping_values:
         if ":" not in item:
@@ -17,7 +30,18 @@ def _parse_mapping(mapping_values: list[str]):
 
 
 def main():
-    """Entry point for the datakit CLI."""
+    """Run the datakit command-line interface.
+
+    The command supports ``merge``, ``merge-classes``, ``remap``, and
+    ``visualize`` subcommands.
+
+    Example:
+        ```python
+        # From a shell:
+        # datakit merge Drones R2P2.v2-raw-images.yolov11 --out new_dataset
+        main()
+        ```
+    """
     parser = argparse.ArgumentParser(prog="datakit")
     parser.add_argument(
         "--format",

@@ -10,7 +10,13 @@ class DatasetFormatHandler(ABC):
 
     @abstractmethod
     def merge_datasets(self, datasets: list[str], out_dir: str):
-        """Merge multiple datasets into one dataset."""
+        """Merge multiple datasets into a single output dataset.
+
+        Example:
+            ```python
+            handler.merge_datasets(["Drones", "R2P2.v2-raw-images.yolov11"], "new_dataset")
+            ```
+        """
 
     @abstractmethod
     def merge_classes(
@@ -20,7 +26,13 @@ class DatasetFormatHandler(ABC):
         merge_into_name: str,
         update_yaml: bool = True,
     ):
-        """Merge multiple classes into a target class."""
+        """Merge multiple classes into a target class.
+
+        Example:
+            ```python
+            handler.merge_classes("new_dataset", ["Backpack", "Backpacks"], "bag")
+            ```
+        """
 
     @abstractmethod
     def remap_dataset(
@@ -29,7 +41,13 @@ class DatasetFormatHandler(ABC):
         new_names: list[str],
         id_mapping: dict[int, int],
     ):
-        """Remap class IDs and class names."""
+        """Remap class IDs and class names.
+
+        Example:
+            ```python
+            handler.remap_dataset("new_dataset", ["bag", "person"], {0: 0, 1: 0, 2: 1})
+            ```
+        """
 
     @abstractmethod
     def visualize_samples(
@@ -42,7 +60,18 @@ class DatasetFormatHandler(ABC):
         cols: int | None = None,
         tile_size: tuple[int, int] = (640, 640),
     ):
-        """Visualize random labeled samples."""
+        """Visualize random labeled samples.
+
+        Example:
+            ```python
+            handler.visualize_samples(
+                images_dir="new_dataset/train/images",
+                labels_dir="new_dataset/train/labels",
+                names=["car", "person"],
+                n=8,
+            )
+            ```
+        """
 
 
 __all__ = ["DatasetFormatHandler"]
