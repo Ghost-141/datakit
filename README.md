@@ -1,6 +1,8 @@
 # datakit
 
-[PyPI: cv-datakit](https://pypi.org/project/cv-datakit/)
+[![PyPI](https://img.shields.io/pypi/v/cv-datakit.svg)](https://pypi.org/project/cv-datakit/)
+[![Python](https://img.shields.io/pypi/pyversions/cv-datakit.svg)](https://pypi.org/project/cv-datakit/)
+
 
 Python package for YOLO-format dataset operations:
 - merge multiple datasets into one
